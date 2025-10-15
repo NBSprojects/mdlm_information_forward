@@ -1,0 +1,55 @@
+data:
+  text8_path: "data/text8.zip"
+  seq_len: 256
+  train_frac: 0.98
+  batch_size: 512
+  num_workers: 8
+  lowercase_only: true
+  chars: "abcdefghijklmnopqrstuvwxyz "
+  mask_char: "█"
+
+mlp:
+  hidden: 512
+  depth: 3
+  dropout: 0.1
+  lr: 0.001
+  batch_size_MLP: 64
+  wd: 0.0
+  steps: 500
+  t_samples_per_step: 32
+  beta_min: 0.1
+  beta_max: 20.0
+  alpha_min: 0.1
+  alpha_max: 20.0
+
+diffusion:
+  d_model: 512
+  n_heads: 8
+  n_layers: 8
+  ff_mult: 4.0
+  dropout: 0.1
+  lr: 3e-5
+  batch_size_denoiser: 512
+  wd: 0.01
+  steps: 20000
+  warmup: 1000
+  grad_clip: 1.0
+  log_interval: 100
+  eval_interval: 1000
+  ema_decay: 0.999
+  ema_start: 0
+
+precision:
+  bf16_only: false
+  use_autocast: true
+  upcast_softmax_to_fp32: true
+
+sampling:
+  grid: "cosine"
+  schedule: "linear"
+  steps: 1000
+  temperature: 1.0
+  snapshots_every: 100
+  top_p: 1.0
+  prefix: null
+  n_samples: 1

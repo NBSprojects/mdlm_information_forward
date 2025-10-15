@@ -1,0 +1,11 @@
+data:
+  seq_len: 128
+  batch_size: 128
+
+mlp:
+  steps: 100
+
+diffusion:
+  steps: 1000
+  log_interval: 50
+  eval_interval: 200
