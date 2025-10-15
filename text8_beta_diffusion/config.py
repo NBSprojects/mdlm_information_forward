@@ -45,7 +45,7 @@ class DiffusionConfig:
     ff_mult: float = 4.0
     dropout: float = 0.1
     lr: float = 3e-5
-    batch_size_denoiser: int = 128
+    batch_size_denoiser: int = 256
     wd: float = 0.01
     steps: int = 20_000
     warmup: int = 1_000
@@ -56,12 +56,12 @@ class DiffusionConfig:
     ema_decay: float = 0.999
     ema_start: int = 0
     weighted_loss: bool = True
-    sample_every: int = 1000
+    sample_every: int = 500
     
 @dataclass
 class PrecisionConfig:
-    bf16_only: bool = False
-    use_autocast: bool = True
+    bf16_only: bool = True
+    use_autocast: bool = False
     upcast_softmax_to_fp32: bool = True
 
 @dataclass
