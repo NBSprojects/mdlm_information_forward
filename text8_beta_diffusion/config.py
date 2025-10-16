@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Literal
+
 
 @dataclass
 class DataConfig:
@@ -38,12 +39,39 @@ class MLPConfig:
     alpha_max: float = 20.0
 
 @dataclass
+class TransformerConfig:
+    # Choix d’archi
+    arch: Literal["compat", "llama2"] = "llama2"
+    # Dimensions
+    d_model: int = 288
+    n_heads: int = 6
+    n_layers: int = 6
+    n_kv_heads: Optional[int] = None  # GQA: si None => = n_heads
+    # MLP
+    mlp_type: Literal["swiglu", "geglu", "glu"] = "swiglu"
+    multiple_of: int = 32
+    ff_mult: float = 4.0              # facteur si tu veux dévier du (2/3)*4d
+    # Normalisation / init
+    norm_eps: float = 1e-5
+    dropout: float = 0.0
+    qkv_bias: bool = False
+    weight_tying: bool = False
+    w_init_scale: float = 1.0
+    depth_scaled_init: bool = False
+    # Conditionnement
+    cond_type: Literal["adaln", "adaln_zero"] = "adaln"
+    # Entrée / sortie / RoPE
+    embed_input: bool = True          # True = Embedding; False = Linear(x)
+    rope_theta: float = 10_000.0
+    max_seq_len: int = 256
+    # Autres
+    causal: bool = False
+    time_scale: float = 1000.0        # pour garder compat : t -> t*1000 avant embedding
+
+
+@dataclass
 class DiffusionConfig:
-    d_model: int = 512
-    n_heads: int = 8
-    n_layers: int = 8
-    ff_mult: float = 4.0
-    dropout: float = 0.1
+    transformer: TransformerConfig = TransformerConfig()
     lr: float = 3e-5
     batch_size_denoiser: int = 256
     wd: float = 0.01
@@ -52,6 +80,7 @@ class DiffusionConfig:
     grad_clip: float = 1.0
     log_interval: int = 100
     eval_interval: int = 1_000
+    verbose_batch: bool = True   # <-- NOUVEAU: active le dump du sous-batch en logs
     ema: bool = False
     ema_decay: float = 0.999
     ema_start: int = 0
@@ -74,3 +103,38 @@ class SamplingConfig:
     top_p: float = 1.0
     prefix: Optional[str] = None
     n_samples: int = 1
+
+
+@dataclass
+class CheckpointConfig:
+    # Chemin vers un checkpoint de débruiteur (optionnel)
+    load_denoiser_from: Optional[str] = None
+    # Chemin vers un checkpoint de MLP (optionnel) -> state_dict() attendu
+    load_mlp_from: Optional[str] = None
+
+@dataclass
+class ValidationConfig:
+    # 1) Sampling depuis les poids chargés
+    enable_sampling_from_checkpoint: bool = False
+    sampling_n_samples: int = 2
+    sampling_steps: int = 400
+    sampling_grid: str = "cosine"
+    sampling_temperature: float = 1.0
+    sampling_top_p: float = 1.0
+    sampling_prefix: Optional[str] = None
+    # 2) Statistiques d'information
+    run_info_stats: bool = False
+    info_stats_batches: int = 1
+    info_stats_compute_kl: bool = True
+    info_stats_compute_ot: bool = False  # calcul OT (POT) plus coûteux
+    info_stats_entropy_in_bits: bool = True
+    # 3) Statistiques des paramètres (a,b) du MLP
+    run_mlp_param_stats: bool = False
+    mlp_param_stats_batches: int = 1
+    mlp_param_stats_threshold: float = 19.9
+    mlp_param_stats_positions_per_seq: int = 10
+    mlp_param_stats_max_seqs_to_show: int = 10
+    # 4) Évaluation du gain MSE intégré (Beta vs baseline p(t)=t)
+    run_mse_gain_eval: bool = False
+    mse_gain_batches: int = 10
+    mse_gain_t_samples: int = 64

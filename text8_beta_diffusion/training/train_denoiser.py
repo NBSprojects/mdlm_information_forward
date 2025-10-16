@@ -118,6 +118,62 @@ def train_diffusion(
               f"opt={row['time.optim_step_ms']:.2f} ema={row['time.ema_update_ms']:.2f}]"
             )
 
+            # ====== NOUVEAU: verbose_batch ======
+            if getattr(diff_cfg, "verbose_batch", False):
+                # Fenêtre de 20 tokens, p dans [0, 256-20]; si L < 256 on borne pour ne pas dépasser
+                B, L = x0.size(0), x0.size(1)
+                width = 20
+                base_len = 256
+                L_eff = min(base_len, L)
+                # borne supérieure inclusive (si L_eff == width => 0)
+                max_p = max(L_eff - width, 0)
+                p_pos = int(torch.randint(low=0, high=max_p + 1, size=(1,), device=x0.device).item())
+                p_end = p_pos + width
+                Bv = min(10, B)
+
+                # Paramètres MLP sur le batch courant (pas de gradient)
+                with torch.no_grad():
+                    mlp_out = mlp_model(info)  # sorties typiques: (a, b) de shape [B, L]
+                    # Supporte tuple/list, dict({'a','b'}), ou Tensor [..., 2]
+                    if isinstance(mlp_out, (tuple, list)) and len(mlp_out) >= 2:
+                        a_full, b_full = mlp_out[0], mlp_out[1]
+                    elif isinstance(mlp_out, dict):
+                        a_full = mlp_out.get("a", mlp_out.get("alpha", None))
+                        b_full = mlp_out.get("b", mlp_out.get("beta", None))
+                        if a_full is None or b_full is None:
+                            # prend les deux premières clés si noms inattendus
+                            _vals = list(mlp_out.values())
+                            a_full = _vals[0]; b_full = _vals[1]
+                    else:
+                        # Tensor unique avec dernière dim=2
+                        if mlp_out.dim() >= 3 and mlp_out.size(-1) >= 2:
+                            a_full = mlp_out[..., 0]
+                            b_full = mlp_out[..., 1]
+                        else:
+                            a_full = mlp_out
+                            b_full = torch.zeros_like(mlp_out)
+
+                # Slices [first 10, p:p+20]
+                toks_slice = x0[:Bv, p_pos:p_end]      # [Bv, <=20]
+                info_slice = info[:Bv, p_pos:p_end]    # [Bv, <=20]
+                a_slice = a_full[:Bv, p_pos:p_end]
+                b_slice = b_full[:Bv, p_pos:p_end]
+
+                # Affichage via log(...), pas de print
+                log(f"[VerboseBatch] step={step} p={p_pos} window=[{p_pos}:{p_end}] (first {Bv}/{B})")
+                for i in range(Bv):
+                    ids = toks_slice[i].detach().cpu().tolist()
+                    a_vals = [round(float(v), 3) for v in a_slice[i].detach().cpu().flatten().tolist()]
+                    b_vals = [round(float(v), 3) for v in b_slice[i].detach().cpu().flatten().tolist()]
+                    info_vals = [round(float(v), 3) for v in info_slice[i].detach().cpu().flatten().tolist()]
+
+                    log(f"  -- seq[{i}] tokens[{p_pos}:{p_end}]: {ids}")
+                    log(f"     mlp.a: {a_vals}")
+                    log(f"     mlp.b: {b_vals}")
+                    log(f"     info : {info_vals}")
+                # ====== FIN verbose_batch ======
+
+
         # Évaluation périodique (inchangée, on ajoute seulement l'écriture dans 'row')
         if step % diff_cfg.eval_interval == 0:
             eval_net = ema.ema if ema is not None else denoiser

@@ -4,6 +4,7 @@ from text8_beta_diffusion.setup_torch import set_seed, enable_fast_kernels, add_
 from text8_beta_diffusion.utils.precision import PrecisionPolicy, to_model_dtype
 from text8_beta_diffusion.data import make_dataloaders
 from text8_beta_diffusion.models.transformer_compat import DenoiserCompat
+from text8_beta_diffusion.models.transformer_llama2_like import DenoiserLlama2Like
 from text8_beta_diffusion.models.scheduler_mlp import SchedulerMLP
 from text8_beta_diffusion.info.denoiser_info import DenoiserInfoProvider
 from text8_beta_diffusion.training.train_denoiser import train_diffusion
@@ -19,15 +20,50 @@ def main():
     set_seed(1234); enable_fast_kernels(); add_torchversion_safe_globals()
     data_cfg = DataConfig(); diff_cfg = DiffusionConfig(); mlp_cfg  = MLPConfig()
 
-    
-
     if args.steps is not None:
         diff_cfg.steps = args.steps
     precision = PrecisionPolicy(bf16_only=args.bf16_only, use_autocast=True, upcast_softmax_to_fp32=True)
     train_loader, val_loader, vocab_size, mask_id = make_dataloaders(data_cfg, diff_cfg.batch_size_denoiser)
-    denoiser = DenoiserCompat(vocab_size=vocab_size, d_model=diff_cfg.d_model,
-                              n_heads=diff_cfg.n_heads, n_layers=diff_cfg.n_layers,
-                              ff_mult=diff_cfg.ff_mult, dropout=diff_cfg.dropout, max_seq_len=data_cfg.seq_len)
+
+    tcfg = diff_cfg.transformer  # nouveau bloc de config
+
+    if tcfg.arch == "compat":
+        denoiser = DenoiserCompat(
+            vocab_size=vocab_size,
+            d_model=tcfg.d_model,
+            n_heads=tcfg.n_heads,
+            n_layers=tcfg.n_layers,
+            ff_mult=tcfg.ff_mult,
+            dropout=tcfg.dropout,
+            mask_id=mask_id,
+            max_seq_len=tcfg.max_seq_len,
+        )
+    elif tcfg.arch == "llama2":
+        denoiser = DenoiserLlama2Like(
+            vocab_size=vocab_size,
+            mask_id=mask_id,
+            d_model=tcfg.d_model,
+            n_heads=tcfg.n_heads,
+            n_layers=tcfg.n_layers,
+            n_kv_heads=tcfg.n_kv_heads,
+            mlp_type=tcfg.mlp_type,
+            multiple_of=tcfg.multiple_of,
+            ff_mult=tcfg.ff_mult,
+            dropout=tcfg.dropout,
+            norm_eps=tcfg.norm_eps,
+            w_init_scale=tcfg.w_init_scale,
+            depth_scaled_init=tcfg.depth_scaled_init,
+            cond_type=tcfg.cond_type,
+            embed_input=tcfg.embed_input,
+            rope_theta=tcfg.rope_theta,
+            max_seq_len=tcfg.max_seq_len,
+            weight_tying=tcfg.weight_tying,
+            causal=tcfg.causal,
+            time_scale=tcfg.time_scale,
+        )
+    else:
+        raise ValueError(f"Unknown transformer arch: {tcfg.arch}")
+
     to_model_dtype(denoiser, precision)
     denoiser.classifier.prepare_rope(device=next(denoiser.parameters()).device, dtype=torch.float32)
 
