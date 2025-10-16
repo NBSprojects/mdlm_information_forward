@@ -45,6 +45,14 @@ class DenoiserInfoProvider(BaseInfoProvider):
                 if unexpected: print("[InfoProvider] Unexpected keys:", unexpected)
             self.model.eval()
 
+        # denoiser_info.py (dans __init__, après self.model = ... ; self.model.eval())
+        try:
+            # Certains denoisers (compat/llama2_like) exposent classifier.prepare_rope(...)
+            self.model.classifier.prepare_rope(device=self.device, dtype=torch.float32)
+        except AttributeError:
+            pass
+
+
         if K < 2:
             raise ValueError("K must be ≥ 2 so that N = 2^K - 2 ≥ 2.")
         self.K = int(K)

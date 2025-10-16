@@ -14,9 +14,42 @@ class DataConfig:
     mask_char: str = "█"
 
 @dataclass
-class NGramConfig:
-    order: int = 7
-    min_count: int = 1
+class InfoProviderDenoiserConfig:
+    d_model: int = 512
+    n_heads: int = 8
+    n_layers: int = 8
+    ff_mult: float = 4.0
+    dropout: float = 0.1
+    max_seq_len: int = 256
+    # Poids pré-entraînés (chemin où les trouver)
+    weights_path: Optional[str] = "checkpoints/denoiser_final.pt"
+    # Si True, on échoue si le fichier n'existe pas
+    require_weights: bool = True
+    lr: float = 3e-5
+    batch_size_denoiser: int =  512
+    wd: float = 0.01
+    steps: int = 20000
+    warmup: int = 1000
+    grad_clip: float = 1.0
+    log_interval: int = 100
+    eval_interval: int = 1000
+    ema_decay: float = 0.999  # décroissance EMA
+    ema_start: int = 0
+
+@dataclass
+class InfoProviderRuntimeConfig:
+    # Réglages "runtime" de DenoiserInfoProvider
+    K: int = 4
+    ensure_coverage: bool = False
+    normalize_sum_to_one: bool = True
+    agg_mode: Literal["naive", "hajek", "ht"] = "hajek"
+    mix_weight: float = 0.5
+    use_exp_perplexity: bool = False
+    max_forward_batch: Optional[int] = 1024
+    time_from_pi: bool = True
+    ht_exclude_forced: bool = False
+
+
 
 @dataclass
 class InfoConfig:
@@ -37,11 +70,19 @@ class MLPConfig:
     beta_max: float = 20.0
     alpha_min: float = 0.1
     alpha_max: float = 20.0
+    # === Nouveaux chemins/flags ===
+    # Où SAUVER le scheduler MLP après son entraînement
+    save_path: str = "checkpoints/scheduler_mlp.pt"
+    # Où CHARGER le scheduler MLP quand on lance train_denoiser_cli.py
+    load_path_for_info: Optional[str] = "checkpoints/scheduler_mlp.pt"
+    # Si True, on échoue si le fichier n'existe pas
+    required_for_info: bool = True
+
 
 @dataclass
 class TransformerConfig:
     # Choix d’archi
-    arch: Literal["compat", "llama2"] = "llama2"
+    arch: Literal["compat", "llama2"] = "compat"
     # Dimensions
     d_model: int = 288
     n_heads: int = 6

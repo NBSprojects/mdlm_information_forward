@@ -2,6 +2,7 @@ from __future__ import annotations
 import math, torch, torch.nn as nn, torch.nn.functional as F
 from typing import Optional
 from ..utils.checkpoints import load_state_dict_from_checkpoint
+from .base_denoiser import BaseDenoiser
 
 
 class CondEmbeddingCompat(nn.Module):
@@ -150,7 +151,9 @@ class TransformerClassifierCompat(nn.Module):
         logits = self.to_logits(h)
         return logits
 
-class DenoiserCompat(nn.Module):
+
+
+class DenoiserCompat(BaseDenoiser):
     def __init__(self, vocab_size: int, d_model: int, n_heads: int, n_layers: int,
                  ff_mult: float = 4.0, dropout: float = 0.0, mask_id: int | None = None, max_seq_len: int = 256):
         super().__init__()
@@ -168,6 +171,9 @@ class DenoiserCompat(nn.Module):
         else:
             sd_cls = state_dict
         return self.classifier.load_state_dict(sd_cls, strict=strict)
+
+    def rope_target(self):
+        return self.classifier
 
 def build_denoiser_for_info_from_checkpoint(
     weights_path: str, device: torch.device, vocab_size: int, mask_id: int,

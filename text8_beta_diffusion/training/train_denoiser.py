@@ -129,7 +129,7 @@ def train_diffusion(
                 max_p = max(L_eff - width, 0)
                 p_pos = int(torch.randint(low=0, high=max_p + 1, size=(1,), device=x0.device).item())
                 p_end = p_pos + width
-                Bv = min(10, B)
+                Bv = min(5, B)
 
                 # Paramètres MLP sur le batch courant (pas de gradient)
                 with torch.no_grad():

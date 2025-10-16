@@ -10,6 +10,8 @@ from text8_beta_diffusion.info.denoiser_info import DenoiserInfoProvider
 from text8_beta_diffusion.training.train_denoiser import train_diffusion
 from text8_beta_diffusion.models.ema import ModelEMA
 
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--bf16-only", action="store_true")

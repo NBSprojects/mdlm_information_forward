@@ -3,6 +3,7 @@
 from __future__ import annotations
 import math, torch, torch.nn as nn, torch.nn.functional as F
 from typing import Optional, Literal
+from .base_denoiser import BaseDenoiser
 
 # ---------- utils ----------
 
@@ -83,8 +84,8 @@ class CondEmbedding(nn.Module):
     def forward(self, t: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         temb = get_timestep_embedding(t, self.embedding_dim)
         h = temb if cond is None else torch.cat([temb, cond], dim=-1)
-        return F.silu(self.proj0(h)).relu() * 0 + self.proj1(F.silu(self.proj0(h)))  # simple MLP SiLU
-        # (si tu veux strictement coller à la version JAX, garde 2 couches SiLU enchaînées)
+        h = F.silu(self.proj0(h))
+        return self.proj1(h)
 
 # ---------- composants Transformer ----------
 
@@ -262,7 +263,10 @@ class TransformerLlama2Like(nn.Module):
         logits = self.to_logits(h)
         return logits
 
-class DenoiserLlama2Like(nn.Module):
+    def prepare_rope(self, device=None, dtype=None):
+        return  # rien à faire pour cette architecture, mais on retourne None pour la cohérence avec BaseDenoiser
+
+class DenoiserLlama2Like(BaseDenoiser):
     def __init__(self,
                  vocab_size: int, mask_id: int,
                  d_model: int, n_heads: int, n_layers: int, n_kv_heads: Optional[int],
@@ -286,9 +290,18 @@ class DenoiserLlama2Like(nn.Module):
             embed_input=embed_input, rope_theta=rope_theta, max_seq_len=max_seq_len,
             weight_tying=weight_tying, causal=causal, time_scale=time_scale
         )
+        self.backbone = self.net
         self.time_scale = float(time_scale)
 
     def forward(self, xt: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         # compatibilité : on garde t * time_scale (par défaut 1000.0)
         cond_vec = self.cond_mlp(t.view(-1) * self.time_scale).unsqueeze(1)  # [B,1,dim]
         return self.net(xt, t, cond_vec, training=self.training)
+
+    def rope_target(self):
+        return self.backbone
+
+    # (facultatif mais utile pour rétro-compat)
+    @property
+    def classifier(self):
+        return self.backbone
