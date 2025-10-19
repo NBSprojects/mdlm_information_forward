@@ -17,10 +17,25 @@ def main():
     set_seed(1234); enable_fast_kernels(); add_torchversion_safe_globals()
     data_cfg = DataConfig(); diff_cfg = DiffusionConfig(); mlp_cfg = MLPConfig()
     _, _, vocab_size, mask_id = make_dataloaders(data_cfg, diff_cfg.batch_size_denoiser)
-    denoiser = DenoiserCompat(vocab_size=vocab_size, d_model=diff_cfg.d_model,
-                              n_heads=diff_cfg.n_heads, n_layers=diff_cfg.n_layers,
-                              ff_mult=diff_cfg.ff_mult, dropout=diff_cfg.dropout, max_seq_len=data_cfg.seq_len)
+    tcfg = diff_cfg.transformer
+    denoiser = DenoiserCompat(
+        vocab_size=vocab_size,
+        d_model=tcfg.d_model,
+        n_heads=tcfg.n_heads,
+        n_layers=tcfg.n_layers,
+        ff_mult=tcfg.ff_mult,
+        dropout=tcfg.dropout,
+        max_seq_len=tcfg.max_seq_len,
+        mask_id=mask_id,  # recommandé pour expliciter l’ID du token masque
+    )
+    
     denoiser.classifier.prepare_rope(device=next(denoiser.parameters()).device, dtype=torch.float32)
+    denoiser = torch.compile(
+        denoiser,
+        mode="reduce-overhead",
+        dynamic=True,        # micro-batches de tailles variables
+        fullgraph=True
+    )
     mlp_model = SchedulerMLP(seq_len=data_cfg.seq_len, hidden=mlp_cfg.hidden, depth=mlp_cfg.depth, dropout=mlp_cfg.dropout,
                              alpha_min=mlp_cfg.alpha_min, alpha_max=mlp_cfg.alpha_max,
                              beta_min=mlp_cfg.beta_min, beta_max=mlp_cfg.beta_max)

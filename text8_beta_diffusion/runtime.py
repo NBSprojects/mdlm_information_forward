@@ -13,10 +13,17 @@ def build_everything(data_cfg: DataConfig, diff_cfg: DiffusionConfig, mlp_cfg: M
     precision = PrecisionPolicy(bf16_only=precision_cfg.bf16_only, use_autocast=precision_cfg.use_autocast,
                                 upcast_softmax_to_fp32=precision_cfg.upcast_softmax_to_fp32)
     train_loader, val_loader, vocab_size, mask_id = make_dataloaders(data_cfg, diff_cfg.batch_size_denoiser)
-    denoiser = DenoiserCompat(vocab_size=vocab_size, d_model=diff_cfg.d_model,
-                              n_heads=diff_cfg.n_heads, n_layers=diff_cfg.n_layers,
-                              ff_mult=diff_cfg.ff_mult, dropout=diff_cfg.dropout, max_seq_len=data_cfg.seq_len)
-    to_model_dtype(denoiser, precision)
+    tcfg = diff_cfg.transformer
+    denoiser = DenoiserCompat(
+        vocab_size=vocab_size,
+        d_model=tcfg.d_model,
+        n_heads=tcfg.n_heads,
+        n_layers=tcfg.n_layers,
+        ff_mult=tcfg.ff_mult,
+        dropout=tcfg.dropout,
+        max_seq_len=tcfg.max_seq_len,
+        mask_id=mask_id,
+    )
     denoiser.classifier.prepare_rope(device=next(denoiser.parameters()).device, dtype=torch.float32)
     mlp_model = SchedulerMLP(seq_len=data_cfg.seq_len, hidden=mlp_cfg.hidden, depth=mlp_cfg.depth, dropout=mlp_cfg.dropout,
                              alpha_min=mlp_cfg.alpha_min, alpha_max=mlp_cfg.alpha_max,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os, csv
 from dataclasses import asdict, is_dataclass
 from typing import Any, Dict
+import torch.nn as nn
 
 def log(*args, **kwargs):
     # Garder la compat console
@@ -73,3 +74,44 @@ class CSVLogger:
             w.writeheader()
             for r in self.rows:
                 w.writerow({**self.hp, **r})
+
+
+def get_model_summary(model: nn.Module):
+    """
+    Calcule et affiche le nombre de paramètres et la taille mémoire statique d'un modèle.
+    """
+    
+    # --- 1. Comptage des Paramètres ---
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    non_trainable_params = total_params - trainable_params
+    
+    print("\n" + "="*40)
+    print("       RÉSUMÉ DU MODÈLE")
+    print("="*40)
+    print(f"Nombre total de paramètres: {total_params:,}")
+    print(f"  > Paramètres entraînables:  {trainable_params:,}")
+    print(f"  > Paramètres non-entraînables: {non_trainable_params:,}")
+    print("-"*40)
+
+    # --- 2. Calcul de la Taille Mémoire Statique ---
+    # (Taille des poids et des buffers, sans compter les gradients ou activations)
+    
+    # Mémoire prise par les paramètres (poids, biais, etc.)
+    param_mem_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+    
+    # Mémoire prise par les buffers 
+    # (ex: running_mean/var de BatchNorm, ou vos 'rope_cos_f32' ici)
+    # model.buffers() inclut ceux enregistrés avec persistent=False
+    buffer_mem_bytes = sum(b.numel() * b.element_size() for b in model.buffers())
+    
+    total_mem_bytes = param_mem_bytes + buffer_mem_bytes
+    
+    print("Empreinte Mémoire Statique (Modèle seul)")
+    print(f"  > Mémoire des paramètres: {param_mem_bytes / (1024**2):.3f} MB")
+    print(f"  > Mémoire des buffers:    {buffer_mem_bytes / (1024**2):.3f} MB")
+    print(f"  > Mémoire totale statique:  {total_mem_bytes / (1024**2):.3f} MB")
+    print("-"*40)
+    print("Note : La 'mémoire statique' est la place que le modèle prend en VRAM")
+    print("AVANT toute passe forward. Elle n'inclut PAS la mémoire dynamique")
+    print("utilisée pour les activations ou les gradients pendant l'entraînement.")

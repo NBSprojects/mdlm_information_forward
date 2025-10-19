@@ -3,6 +3,7 @@ import math, torch, torch.nn as nn, torch.nn.functional as F
 from typing import Optional
 from ..utils.checkpoints import load_state_dict_from_checkpoint
 from .base_denoiser import BaseDenoiser
+from text8_beta_diffusion.utils.logging import get_model_summary
 
 
 class CondEmbeddingCompat(nn.Module):
@@ -163,6 +164,8 @@ class DenoiserCompat(BaseDenoiser):
             vocab_size=vocab_size, mask_id=mask_id, dim=d_model, n_layers=n_layers,
             n_heads=n_heads, mlp_mult=ff_mult, dropout=dropout, max_seq_len=max_seq_len
         )
+        get_model_summary(self.classifier)
+        
     def forward(self, xt: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return self.classifier(xt, t, train=self.training)
     def load_state_dict(self, state_dict, strict: bool = True):

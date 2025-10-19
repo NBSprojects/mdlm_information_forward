@@ -114,7 +114,9 @@ class DenoiserInfoProvider(BaseInfoProvider):
         for start in range(0, BN, mb):
             end = min(start + mb, BN)
             with autocast_ctx(self.precision):
-                logits = self.model(xt[start:end], t_vec[start:end])
+                with torch.no_grad():
+                    logits = self.model(xt[start:end], t_vec[start:end])
+                #logits = self.model(xt[start:end], t_vec[start:end])
             log_probs = torch.nn.functional.log_softmax(
                 maybe_upcast_for_stability(logits, self.precision), dim=-1
             )

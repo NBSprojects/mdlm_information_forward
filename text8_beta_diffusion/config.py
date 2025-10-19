@@ -130,8 +130,8 @@ class DiffusionConfig:
     
 @dataclass
 class PrecisionConfig:
-    bf16_only: bool = True
-    use_autocast: bool = False
+    bf16_only: bool = False
+    use_autocast: bool = True
     upcast_softmax_to_fp32: bool = True
 
 @dataclass
@@ -179,3 +179,7 @@ class ValidationConfig:
     run_mse_gain_eval: bool = False
     mse_gain_batches: int = 10
     mse_gain_t_samples: int = 64
+
+    enable_initial_md4_from_infoprovider: bool = True
+    sampling_schedule: str = "linear"                  # 'linear' ou 'cosine' pour sample_md4
+    sampling_snapshots_every: Optional[int] = 100  
