@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Literal
 
@@ -25,16 +26,6 @@ class InfoProviderDenoiserConfig:
     weights_path: Optional[str] = "checkpoints/denoiser_final.pt"
     # Si True, on échoue si le fichier n'existe pas
     require_weights: bool = True
-    lr: float = 3e-5
-    batch_size_denoiser: int =  512
-    wd: float = 0.01
-    steps: int = 20000
-    warmup: int = 1000
-    grad_clip: float = 1.0
-    log_interval: int = 100
-    eval_interval: int = 1000
-    ema_decay: float = 0.999  # décroissance EMA
-    ema_start: int = 0
 
 @dataclass
 class InfoProviderRuntimeConfig:
@@ -77,6 +68,11 @@ class MLPConfig:
     load_path_for_info: Optional[str] = "checkpoints/scheduler_mlp.pt"
     # Si True, on échoue si le fichier n'existe pas
     required_for_info: bool = True
+    # === Integrated MSE vs baseline eval (for train_scheduler_cli) ===
+    mse_eval_enable: bool = True
+    mse_eval_batches: int = 10
+    mse_eval_t_samples: int = 64               # Gauss-Legendre nodes for outer integral
+    mse_eval_inner_nodes: int = 16            # inner quadrature nodes (keep 16 for stability)
 
 
 @dataclass
@@ -84,9 +80,9 @@ class TransformerConfig:
     # Choix d’archi
     arch: Literal["compat", "llama2"] = "compat"
     # Dimensions
-    d_model: int = 288
-    n_heads: int = 6
-    n_layers: int = 6
+    d_model: int = 512
+    n_heads: int = 8
+    n_layers: int = 8
     n_kv_heads: Optional[int] = None  # GQA: si None => = n_heads
     # MLP
     mlp_type: Literal["swiglu", "geglu", "glu"] = "swiglu"
@@ -116,17 +112,36 @@ class DiffusionConfig:
     lr: float = 3e-5
     batch_size_denoiser: int = 256
     wd: float = 0.01
-    steps: int = 20_000
+    steps: int = 50_000
     warmup: int = 1_000
     grad_clip: float = 1.0
     log_interval: int = 100
     eval_interval: int = 1_000
     verbose_batch: bool = True   # <-- NOUVEAU: active le dump du sous-batch en logs
-    ema: bool = False
+    ema: bool = True
     ema_decay: float = 0.999
     ema_start: int = 0
     weighted_loss: bool = True
-    sample_every: int = 500
+    sample_every: int = 1_000
+
+    # === NOUVEAU: objectif d’entraînement ===
+    # "beta_gw" = chemin existant (InfoProvider + MLP + Beta par position)
+    # "md4"     = objectif MD4 canonique (CODE 1)
+    train_objective: Literal["beta_gw", "md4"] = "md4"
+
+    # === NOUVEAU: réglages MD4 (calendrier et temps) ===
+    md4_cont_time: bool = True         # comme CODE 1 (continuous-time)
+    md4_timesteps: int = 1000          # si md4_cont_time=False, nombre de pas discrets
+    md4_noise_schedule: str = "linear" # "linear", "cosine", ou "polyK" (ex: "poly3")
+    md4_eps: float = 1e-4
+    md4_antithetic_time_sampling: bool = True
+    md4_normalize_by_masked_tokens: bool = False  # si True, normalise CE par nb de tokens masqués (par échantillon)
+
+    # dans class DiffusionConfig
+    ckpt_path: Optional[str] = "checkpoints/md4_denoiser.pt"
+    ckpt_every: int = 10_000                 # 0 = désactivé, sinon fréquence en steps
+    ckpt_overwrite: bool = True         # False => ajoute _step{N} au nom de fichier
+
     
 @dataclass
 class PrecisionConfig:
@@ -145,6 +160,8 @@ class SamplingConfig:
     prefix: Optional[str] = None
     n_samples: int = 1
 
+    # === NOUVEAU: type de sampler pour MD4 (optionnel)
+    sampler: Literal["ancestral", "topp"] = "ancestral"
 
 @dataclass
 class CheckpointConfig:

@@ -24,3 +24,22 @@ def masked_ce_losses(
         sum_w = w.sum().clamp_min(1.0)
         loss_weighted = (w * ce).sum() / sum_w
     return dict(loss_unweighted=loss_unweighted, loss_weighted=loss_weighted, n_masked=n_mask, sum_weights=sum_w)
+
+
+def masked_ce_per_sample(
+    logits: torch.Tensor, x0: torch.Tensor, xt: torch.Tensor, mask_id: int, normalize_by_masked: bool
+) -> dict:
+    """
+    Version parallèle à celle du module md4_objective, exposée via losses.py pour usage centralisé.
+    """
+    B, L, V = logits.shape
+    ce = F.cross_entropy(logits.reshape(-1, V), x0.reshape(-1), reduction="none").view(B, L)
+    masked = (xt == mask_id)
+    ce_sum = (ce * masked).sum(dim=1)              # [B]
+    n_masked = masked.sum(dim=1)                   # [B]
+    if normalize_by_masked:
+        denom = n_masked.clamp_min(1)
+        ce_batch = ce_sum / denom
+    else:
+        ce_batch = ce_sum
+    return dict(per_sample_loss=ce_batch, n_masked=n_masked)
